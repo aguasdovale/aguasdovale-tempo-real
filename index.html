@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Águas do Vale – Tempo Real</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700&family=Nunito:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#F2F6F8; --panel:#FFFFFF; --ink:#0B1C2C; --muted:#5B6E7E; --line:#DCE5EA;
+  --teal:#0E9F9A; --od:#1F7AE0; --ph:#7A4FD6; --ec:#E08A00; --temp:#D6452F;
+  --ok:#14804A; --okbg:#DDF3E6; --bad:#B3261E; --badbg:#FBE1DE; --warn:#8A5A00; --warnbg:#FFF0CC;
+  --font-d:'Sora',system-ui,sans-serif; --font-b:'Nunito',system-ui,sans-serif;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0B1C2C; --panel:#12293D; --ink:#E8F1F6; --muted:#93A8B8; --line:#24425A;
+  --teal:#3ECFCA; --od:#5AA3FF; --ph:#A98BFF; --ec:#FFB02E; --temp:#FF7A62;
+  --ok:#5FD39A; --okbg:#12392B; --bad:#FF8B82; --badbg:#41201E; --warn:#FFCE6B; --warnbg:#3F3216; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0B1C2C; --panel:#12293D; --ink:#E8F1F6; --muted:#93A8B8; --line:#24425A;
+  --teal:#3ECFCA; --od:#5AA3FF; --ph:#A98BFF; --ec:#FFB02E; --temp:#FF7A62;
+  --ok:#5FD39A; --okbg:#12392B; --bad:#FF8B82; --badbg:#41201E; --warn:#FFCE6B; --warnbg:#3F3216; color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--font-b);font-size:15px;
+  padding-block:20px 40px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.wrap{max-width:1100px;margin:0 auto;display:flex;flex-direction:column;gap:18px}
+header{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;justify-content:space-between}
+h1{font-family:var(--font-d);font-size:clamp(22px,4vw,30px);margin:0;letter-spacing:-.01em;text-wrap:balance}
+.sub{color:var(--muted);margin:4px 0 0}
+.live{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted)}
+.dot{width:10px;height:10px;border-radius:50%;background:var(--muted)}
+.dot.on{background:var(--ok);box-shadow:0 0 0 0 var(--ok);animation:pulse 2s infinite}
+.dot.stale{background:var(--warn)} .dot.off{background:var(--bad)}
+@keyframes pulse{70%{box-shadow:0 0 0 8px transparent}100%{box-shadow:0 0 0 0 transparent}}
+@media (prefers-reduced-motion:reduce){.dot.on{animation:none}}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}
+.kpi{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:6px;min-width:0}
+.kpi h2{margin:0;font-size:13px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);display:flex;justify-content:space-between;gap:8px}
+.val{font-family:var(--font-d);font-size:40px;font-weight:600;font-variant-numeric:tabular-nums;line-height:1.1}
+.val small{font-size:15px;font-weight:600;color:var(--muted);margin-left:6px}
+.pill{align-self:flex-start;font-size:12px;font-weight:700;border-radius:999px;padding:3px 10px;background:var(--line);color:var(--muted)}
+.pill.ok{background:var(--okbg);color:var(--ok)} .pill.bad{background:var(--badbg);color:var(--bad)} .pill.warn{background:var(--warnbg);color:var(--warn)}
+.charts{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:14px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px 16px;min-width:0}
+.card h3{margin:0 0 8px;font-size:14px;font-family:var(--font-d)}
+.cv{position:relative;height:210px}
+.tools{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+button,select{font:inherit;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:6px 10px;cursor:pointer}
+button:focus-visible,select:focus-visible{outline:2px solid var(--teal);outline-offset:2px}
+footer{color:var(--muted);font-size:12.5px;line-height:1.5}
+#msg{background:var(--warnbg);color:var(--warn);border-radius:10px;padding:10px 14px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Águas do Vale · Monitoramento em tempo real</h1>
+      <p class="sub">Estação experimental · UNESP ICT · dados enviados pelo ESP32 ao Firebase</p>
+    </div>
+    <div class="tools">
+      <div class="live"><span id="dot" class="dot"></span><span id="status">Conectando…</span></div>
+      <select id="janela" aria-label="Janela do histórico">
+        <option value="30">Últimas 30 leituras</option>
+        <option value="60">Últimas 60 leituras</option>
+        <option value="120" selected>Últimas 120 leituras</option>
+        <option value="300">Últimas 300 leituras</option>
+      </select>
+      <button id="tema" type="button">Tema</button>
+    </div>
+  </header>
+
+  <div id="msg" hidden></div>
+
+  <section class="kpis" aria-label="Valores atuais">
+    <article class="kpi"><h2>Oxigênio dissolvido</h2><div class="val" id="v-od">—<small>mg/L</small></div><span class="pill" id="p-od">sem dados</span></article>
+    <article class="kpi"><h2>pH</h2><div class="val" id="v-ph">—</div><span class="pill" id="p-ph">sem dados</span></article>
+    <article class="kpi"><h2>Condutividade</h2><div class="val" id="v-ec">—<small>µS/cm</small></div><span class="pill" id="p-ec">sem dados</span></article>
+    <article class="kpi"><h2>Temperatura</h2><div class="val" id="v-temp">—<small>°C</small></div><span class="pill" id="p-temp">sem dados</span></article>
+  </section>
+
+  <section class="charts" aria-label="Histórico">
+    <div class="card"><h3>Oxigênio dissolvido (mg/L)</h3><div class="cv"><canvas id="c-od"></canvas></div></div>
+    <div class="card"><h3>pH</h3><div class="cv"><canvas id="c-ph"></canvas></div></div>
+    <div class="card"><h3>Condutividade elétrica (µS/cm)</h3><div class="cv"><canvas id="c-ec"></canvas></div></div>
+    <div class="card"><h3>Temperatura (°C)</h3><div class="cv"><canvas id="c-temp"></canvas></div></div>
+  </section>
+
+  <footer>
+    Faixas de referência: CONAMA 357/2005, águas doces Classe 2 (OD ≥ 5 mg/L; pH 6,0 a 9,0). A resolução não fixa limite para condutividade nem temperatura da água. Atualização a cada 5 s; o ESP32 grava uma leitura a cada 30 s.
+  </footer>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script>
+const DB = "https://sensorwoz-default-rtdb.firebaseio.com";
+const CAMPOS = {
+  od:   {el:"od",   dec:2, cor:"--od"},
+  ph:   {el:"ph",   dec:2, cor:"--ph"},
+  ec:   {el:"ec",   dec:0, cor:"--ec"},
+  temperatura: {el:"temp", dec:1, cor:"--temp"}
+};
+const $ = id => document.getElementById(id);
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const charts = {};
+
+function setPill(id, texto, cls){ const p=$(id); p.textContent=texto; p.className="pill "+(cls||""); }
+
+function classifica(k, v){
+  if (v==null) return ["sem dados",""];
+  if (k==="od") return v>=5 ? ["Dentro do limite (≥ 5 mg/L)","ok"] : ["Abaixo de 5 mg/L","bad"];
+  if (k==="ph") return (v>=6&&v<=9) ? ["Dentro da faixa 6–9","ok"] : ["Fora da faixa 6–9","bad"];
+  if (k==="ec") return ["Sem limite na CONAMA 357",""];
+  return ["Sem limite na CONAMA 357",""];
+}
+
+function mostraAtual(d){
+  for (const [k,c] of Object.entries(CAMPOS)){
+    const v = d && typeof d[k]==="number" ? d[k] : null;
+    const un = $("v-"+c.el).querySelector("small");
+    $("v-"+c.el).textContent = v==null ? "—" : v.toFixed(c.dec);
+    if (un) $("v-"+c.el).appendChild(un);
+    const [t,cls] = classifica(k,v); setPill("p-"+c.el,t,cls);
+  }
+  const ts = d && d.timestamp ? d.timestamp*1000 : null;
+  const dot=$("dot"), st=$("status");
+  if (!ts){ dot.className="dot off"; st.textContent="Sem leituras"; return; }
+  const idade = (Date.now()-ts)/1000;
+  const hora = new Date(ts).toLocaleTimeString("pt-BR");
+  if (idade<120){ dot.className="dot on"; st.textContent="Ao vivo · última leitura "+hora; }
+  else { dot.className="dot stale"; st.textContent="Sem novas leituras desde "+hora; }
+}
+
+function criaGraficos(){
+  for (const [k,c] of Object.entries(CAMPOS)){
+    charts[k] = new Chart($("c-"+c.el), {
+      type:"line",
+      data:{labels:[],datasets:[{data:[],borderColor:css(c.cor),backgroundColor:css(c.cor)+"22",fill:true,tension:.3,pointRadius:0,borderWidth:2,spanGaps:true}]},
+      options:{responsive:true,maintainAspectRatio:false,animation:false,
+        plugins:{legend:{display:false},tooltip:{mode:"index",intersect:false}},
+        scales:{x:{ticks:{color:css("--muted"),maxTicksLimit:6,maxRotation:0},grid:{color:css("--line")}},
+                y:{ticks:{color:css("--muted")},grid:{color:css("--line")}}}}
+    });
+  }
+}
+function recoloreGraficos(){
+  for (const [k,c] of Object.entries(CAMPOS)){
+    const ch=charts[k]; if(!ch) continue;
+    ch.data.datasets[0].borderColor=css(c.cor); ch.data.datasets[0].backgroundColor=css(c.cor)+"22";
+    ch.options.scales.x.ticks.color=css("--muted"); ch.options.scales.y.ticks.color=css("--muted");
+    ch.options.scales.x.grid.color=css("--line"); ch.options.scales.y.grid.color=css("--line"); ch.update();
+  }
+}
+
+async function getJSON(path){
+  const r = await fetch(DB+path); if(!r.ok) throw new Error("HTTP "+r.status);
+  return r.json();
+}
+function erro(m){ const e=$("msg"); e.hidden=!m; e.textContent=m||""; }
+
+async function atualizaAtual(){
+  try{ mostraAtual(await getJSON("/atual.json")); erro(""); }
+  catch(e){ $("dot").className="dot off"; $("status").textContent="Sem conexão com o banco";
+    erro(String(e.message).includes("401")||String(e.message).includes("403")
+      ? "O banco recusou a leitura. Confira as regras do Realtime Database (.read em atual e historico)."
+      : "Não foi possível ler o Firebase. Verifique a internet."); }
+}
+async function atualizaHistorico(){
+  try{
+    const n = $("janela").value;
+    const url = `/historico.json?orderBy=%22$key%22&limitToLast=${n}`;
+    const obj = await getJSON(url) || {};
+    const arr = Object.values(obj).filter(x=>x&&x.timestamp).sort((a,b)=>a.timestamp-b.timestamp);
+    const rot = arr.map(x=>new Date(x.timestamp*1000).toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"}));
+    for (const k of Object.keys(CAMPOS)){
+      const ch=charts[k];
+      ch.data.labels=rot;
+      ch.data.datasets[0].data=arr.map(x=>typeof x[k]==="number"?x[k]:null);
+      ch.update();
+    }
+  }catch(e){ /* o aviso principal vem de atualizaAtual */ }
+}
+
+$("tema").onclick=()=>{
+  const r=document.documentElement; const escuro=matchMedia("(prefers-color-scheme: dark)").matches;
+  const atual=r.dataset.theme||(escuro?"dark":"light");
+  r.dataset.theme = atual==="dark"?"light":"dark"; recoloreGraficos();
+};
+$("janela").onchange=atualizaHistorico;
+
+criaGraficos(); atualizaAtual(); atualizaHistorico();
+setInterval(atualizaAtual,5000);
+setInterval(atualizaHistorico,30000);
+</script>
+</body>
+</html>
